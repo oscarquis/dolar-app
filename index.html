@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dólar Pro</title>
+
+<style>
+body {
+  background:#0f172a;
+  color:#fff;
+  font-family:Arial;
+  text-align:center;
+}
+
+.card {
+  background:#1e293b;
+  margin:10px;
+  padding:15px;
+  border-radius:12px;
+}
+
+.compra { color:#00ff99; }
+.venta { color:#ff4d4d; }
+
+.up { color:#00ff99; }
+.down { color:#ff4d4d; }
+.equal { color:#aaa; }
+
+h2 { margin-top:20px; }
+</style>
+</head>
+
+<body>
+
+<h2>💰 Dólar en Vivo PRO</h2>
+
+<!-- BLUE -->
+<div class="card">
+  <h3>Blue</h3>
+  <div class="compra">Compra: <span id="blue_c"></span></div>
+  <div class="venta">
+    Venta: <span id="blue_v"></span>
+    <span id="blue_estado"></span>
+  </div>
+</div>
+
+<!-- OFICIAL -->
+<div class="card">
+  <h3>Oficial</h3>
+  <div class="compra">Compra: <span id="oficial_c"></span></div>
+  <div class="venta">
+    Venta: <span id="oficial_v"></span>
+    <span id="oficial_estado"></span>
+  </div>
+</div>
+
+<!-- CRIPTO -->
+<div class="card">
+  <h3>Cripto</h3>
+  <div class="compra">Compra: <span id="cripto_c"></span></div>
+  <div class="venta">
+    Venta: <span id="cripto_v"></span>
+    <span id="cripto_estado"></span>
+  </div>
+</div>
+
+<!-- BOLIVIA -->
+<div class="card">
+  <h3>Bolivia (P2P)</h3>
+  <div class="compra">Compra: <span id="bob_c"></span></div>
+  <div class="venta">
+    Venta: <span id="bob_v"></span>
+    <span id="bob_estado"></span>
+  </div>
+</div>
+
+<p id="hora"></p>
+
+<script>
+// 🔥 valores anteriores
+let prev = {
+  blue: null,
+  oficial: null,
+  cripto: null,
+  bob: null
+};
+
+// 🔥 función estado
+function estado(actual, anterior, id) {
+  let el = document.getElementById(id);
+
+  if (anterior === null) {
+    el.textContent = " ⏳";
+    el.className = "equal";
+    return;
+  }
+
+  let diff = actual - anterior;
+  let pct = (diff / anterior) * 100;
+
+  if (diff > 0) {
+    el.textContent = ` 📈 +${pct.toFixed(2)}%`;
+    el.className = "up";
+  } else if (diff < 0) {
+    el.textContent = ` 📉 ${pct.toFixed(2)}%`;
+    el.className = "down";
+  } else {
+    el.textContent = " ➖ 0%";
+    el.className = "equal";
+  }
+}
+
+// 🔄 cargar datos
+async function cargar() {
+  try {
+    const res = await fetch("http://127.0.0.1:3000/dolar");
+    const d = await res.json();
+
+    // BLUE
+    let blue = d.azul.valor_venta;
+    document.getElementById("blue_c").textContent = "$" + d.azul.valor_compra;
+    document.getElementById("blue_v").textContent = "$" + blue;
+    estado(blue, prev.blue, "blue_estado");
+    prev.blue = blue;
+
+    // OFICIAL
+    let oficial = d.oficial.valor_venta;
+    document.getElementById("oficial_c").textContent = "$" + d.oficial.valor_compra;
+    document.getElementById("oficial_v").textContent = "$" + oficial;
+    estado(oficial, prev.oficial, "oficial_estado");
+    prev.oficial = oficial;
+
+    // CRIPTO
+    if (d.cripto_ars) {
+      let venta = d.cripto_ars * 1.01;
+      document.getElementById("cripto_c").textContent = "$" + (d.cripto_ars * 0.99).toFixed(2);
+      document.getElementById("cripto_v").textContent = "$" + venta.toFixed(2);
+      estado(venta, prev.cripto, "cripto_estado");
+      prev.cripto = venta;
+    }
+
+    // BOLIVIA
+    if (d.p2p_bob) {
+      let venta = d.p2p_bob.venta;
+      document.getElementById("bob_c").textContent = "Bs " + d.p2p_bob.compra.toFixed(2);
+      document.getElementById("bob_v").textContent = "Bs " + venta.toFixed(2);
+      estado(venta, prev.bob, "bob_estado");
+      prev.bob = venta;
+    } else {
+      document.getElementById("bob_c").textContent = "--";
+      document.getElementById("bob_v").textContent = "--";
+    }
+
+    // hora
+    document.getElementById("hora").textContent =
+      "Actualizado: " + new Date().toLocaleTimeString();
+
+  } catch (e) {
+    console.log(e);
+    document.getElementById("hora").textContent = "Error conexión";
+  }
+}
+
+// 🔥 iniciar
+cargar();
+setInterval(cargar, 5000);
+</script>
+
+</body>
+</html>
