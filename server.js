@@ -23,6 +23,36 @@ async function getP2P_BOB() {
       })
     });
 
+
+async function getP2P_ARS() {
+  try {
+    const res = await fetch("https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        asset: "USDT",
+        fiat: "ARS",
+        tradeType: "SELL",
+        page: 1,
+        rows: 3
+      })
+    });
+
+    const data = await res.json();
+
+    let precio = Math.min(...data.data.map(x => parseFloat(x.adv.price)));
+
+    return precio;
+
+  } catch (e) {
+    console.log("Error ARS:", e);
+    return null;
+  }
+}
+
+
     const buyData = await buyRes.json();
     if (!buyData.data || buyData.data.length === 0) return null;
 
@@ -87,8 +117,11 @@ app.get("/dolar", async (req, res) => {
         valor_compra: d1.oficial.value_buy,
         valor_venta: d1.oficial.value_sell
       },
-      cripto_ars: cripto,
-      p2p_bob: p2p
+cripto_ars: cripto,
+  p2p_bob: p2p
+
+const cripto = await getP2P_ARS();
+const p2p = await getP2P_BOB();
     });
 
   } catch (e) {
