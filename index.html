@@ -37,7 +37,7 @@ h2 { margin-top:20px; }
 
 <!-- BLUE -->
 <div class="card">
-  <h3>Blue</h3>
+  <h3>Blue Arg.</h3>
   <div class="compra">Compra: <span id="blue_c"></span></div>
   <div class="venta">
     Venta: <span id="blue_v"></span>
@@ -47,7 +47,7 @@ h2 { margin-top:20px; }
 
 <!-- OFICIAL -->
 <div class="card">
-  <h3>Oficial</h3>
+  <h3>Oficial Arg.</h3>
   <div class="compra">Compra: <span id="oficial_c"></span></div>
   <div class="venta">
     Venta: <span id="oficial_v"></span>
@@ -57,7 +57,7 @@ h2 { margin-top:20px; }
 
 <!-- CRIPTO -->
 <div class="card">
-  <h3>Cripto</h3>
+  <h3>Cripto Arg. </h3>
   <div class="compra">Compra: <span id="cripto_c"></span></div>
   <div class="venta">
     Venta: <span id="cripto_v"></span>
@@ -131,14 +131,20 @@ async function cargar() {
     estado(oficial, prev.oficial, "oficial_estado");
     prev.oficial = oficial;
 
-    // CRIPTO
-    if (d.cripto_ars) {
-      let venta = d.cripto_ars * 1.01;
-      document.getElementById("cripto_c").textContent = "$" + (d.cripto_ars * 0.99).toFixed(2);
-      document.getElementById("cripto_v").textContent = "$" + venta.toFixed(2);
-      estado(venta, prev.cripto, "cripto_estado");
-      prev.cripto = venta;
-    }
+// CRIPTO
+if (d.cripto_ars) {
+  let compra = d.cripto_ars.compra;
+  let venta = d.cripto_ars.venta;
+
+  document.getElementById("cripto_c").textContent = "$" + compra.toFixed(2);
+  document.getElementById("cripto_v").textContent = "$" + venta.toFixed(2);
+
+  estado(venta, prev.cripto, "cripto_estado");
+  prev.cripto = venta;
+} else {
+  document.getElementById("cripto_c").textContent = "--";
+  document.getElementById("cripto_v").textContent = "--";
+}
 
     // BOLIVIA
     if (d.p2p_bob) {

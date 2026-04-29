@@ -1,13 +1,16 @@
 const express = require("express");
 const cors = require("cors");
 
+// 🔥 FIX para fetch en Node
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+
 const app = express();
 app.use(cors());
 
 // 🔹 BINANCE P2P BOLIVIA
 async function getP2P_BOB() {
   try {
-    // 🟢 COMPRA (tú compras USDT)
+    // 🟢 COMPRA
     const buyRes = await fetch("https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search", {
       method: "POST",
       headers: {
@@ -23,43 +26,13 @@ async function getP2P_BOB() {
       })
     });
 
-
-async function getP2P_ARS() {
-  try {
-    const res = await fetch("https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        asset: "USDT",
-        fiat: "ARS",
-        tradeType: "SELL",
-        page: 1,
-        rows: 3
-      })
-    });
-
-    const data = await res.json();
-
-    let precio = Math.min(...data.data.map(x => parseFloat(x.adv.price)));
-
-    return precio;
-
-  } catch (e) {
-    console.log("Error ARS:", e);
-    return null;
-  }
-}
-
-
     const buyData = await buyRes.json();
     if (!buyData.data || buyData.data.length === 0) return null;
 
     let compra = buyData.data.map(x => parseFloat(x.adv.price));
     compra = Math.min(...compra);
 
-    // 🔴 VENTA (tú vendes USDT)
+    // 🔴 VENTA
     const sellRes = await fetch("https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search", {
       method: "POST",
       headers: {
@@ -84,7 +57,62 @@ async function getP2P_ARS() {
     return { compra, venta };
 
   } catch (e) {
-    console.log("Error P2P:", e);
+    console.log("Error BOB:", e);
+    return null;
+  }
+}
+
+// 🔹 BINANCE P2P ARGENTINA
+async function getP2P_ARS() {
+  try {
+    // 🟢 COMPRA
+    const buyRes = await fetch("https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0"
+      },
+      body: JSON.stringify({
+        asset: "USDT",
+        fiat: "ARS",
+        tradeType: "SELL",
+        page: 1,
+        rows: 3
+      })
+    });
+
+    const buyData = await buyRes.json();
+    if (!buyData.data || buyData.data.length === 0) return null;
+
+    let compra = buyData.data.map(x => parseFloat(x.adv.price));
+    compra = Math.min(...compra);
+
+    // 🔴 VENTA
+    const sellRes = await fetch("https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0"
+      },
+      body: JSON.stringify({
+        asset: "USDT",
+        fiat: "ARS",
+        tradeType: "BUY",
+        page: 1,
+        rows: 3
+      })
+    });
+
+    const sellData = await sellRes.json();
+    if (!sellData.data || sellData.data.length === 0) return null;
+
+    let venta = sellData.data.map(x => parseFloat(x.adv.price));
+    venta = Math.max(...venta);
+
+    return { compra, venta };
+
+  } catch (e) {
+    console.log("Error ARS:", e);
     return null;
   }
 }
@@ -92,22 +120,17 @@ async function getP2P_ARS() {
 // 🔹 RUTA PRINCIPAL
 app.get("/dolar", async (req, res) => {
   try {
-    // 🇦🇷 ARGENTINA
+    // 🇦🇷 API Argentina
     const r1 = await fetch("https://api.bluelytics.com.ar/v2/latest");
     const d1 = await r1.json();
 
-    // 🪙 CRIPTO USDT/ARS
-    let cripto = null;
-    try {
-      const r2 = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=USDTARS");
-      const d2 = await r2.json();
-      cripto = parseFloat(d2.price);
-    } catch {}
+    // 🪙 CRIPTO ARS (P2P)
+    const cripto = await getP2P_ARS();
 
     // 🇧🇴 BOLIVIA P2P
     const p2p = await getP2P_BOB();
 
-    // 🔥 RESPUESTA FINAL
+    // 🔥 RESPUESTA
     res.json({
       azul: {
         valor_compra: d1.blue.value_buy,
@@ -117,11 +140,8 @@ app.get("/dolar", async (req, res) => {
         valor_compra: d1.oficial.value_buy,
         valor_venta: d1.oficial.value_sell
       },
-cripto_ars: cripto,
-  p2p_bob: p2p
-
-const cripto = await getP2P_ARS();
-const p2p = await getP2P_BOB();
+      cripto_ars: cripto,
+      p2p_bob: p2p
     });
 
   } catch (e) {
@@ -130,7 +150,7 @@ const p2p = await getP2P_BOB();
   }
 });
 
-// 🔥 PUERTO PARA RENDER
+// 🔥 PUERTO
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
