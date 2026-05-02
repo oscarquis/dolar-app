@@ -114,7 +114,7 @@ function estado(actual, anterior, id) {
 // 🔄 cargar datos
 async function cargar() {
   try {
-    const res = await fetch("http://127.0.0.1:3000/dolar");
+    const res = await fetch("https://dolar-app-1.onrender.com/dolar");
     const d = await res.json();
 
     // BLUE
