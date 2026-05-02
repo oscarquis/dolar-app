@@ -118,7 +118,7 @@ async function getP2P_ARS() {
 }
 
 // 🔹 REFERENCIAL PRO (PROMEDIO)
-function getReferencial(p2p) {
+/*function getReferencial(p2p) {
   if (!p2p) return null;
 
   let promedio = (p2p.compra + p2p.venta) / 2;
@@ -128,7 +128,7 @@ function getReferencial(p2p) {
     venta: promedio * 1.00
   };
 }
-
+*/
 // 🔹 RUTA PRINCIPAL
 app.get("/dolar", async (req, res) => {
   try {
@@ -143,13 +143,30 @@ app.get("/dolar", async (req, res) => {
     const p2p = await getP2P_BOB();
 
     // 🔥 REFERENCIAL AUTOMÁTICO
-    let ref = getReferencial(p2p);
+/*    let ref = getReferencial(p2p);
 
     // fallback por si falla
     if (!ref) {
       ref = { compra: 9.7, venta: 9.9 };
     }
+*/
 
+
+
+// 💱 ARS → BOB
+let ars_bob = {
+  compra: null,
+  venta: null
+};
+
+if (
+  cripto && p2p &&
+  cripto.compra && cripto.venta &&
+  p2p.compra && p2p.venta
+) {
+  ars_bob.compra = p2p.compra / cripto.venta;
+  ars_bob.venta  = p2p.venta / cripto.compra;
+}
     // 🔥 RESPUESTA FINAL
     res.json({
       azul: {
@@ -164,7 +181,8 @@ app.get("/dolar", async (req, res) => {
       p2p_bob: p2p,
 
       // 🔥 NUEVO
-      bcb_referencial: ref
+  //    bcb_referencial: ref,
+ars_bob: ars_bob
     });
 
   } catch (e) {

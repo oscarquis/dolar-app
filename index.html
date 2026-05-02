@@ -74,7 +74,16 @@ h2 { margin-top:20px; }
     <span id="bob_estado"></span>
   </div>
 </div>
-
+<div class="card">
+  <h3>🏦 BCB Referencial</h3>
+  <div class="compra">Compra: <span id="bcb_c"></span></div>
+  <div class="venta">Venta: <span id="bcb_v"></span></div>
+</div>
+<div class="card">
+  <h3>💱 Peso Argentino → Boliviano</h3>
+  <div class="compra">Compra: <span id="arsbob_c"></span></div>
+  <div class="venta">Venta: <span id="arsbob_v"></span></div>
+</div>
 <p id="hora"></p>
 
 <script>
@@ -158,6 +167,48 @@ if (d.cripto_ars) {
       document.getElementById("bob_v").textContent = "--";
     }
 
+// 🏦 BCB REFERENCIAL (SEGURO)
+try {
+
+  if (d.p2p_bob && d.p2p_bob.compra && d.p2p_bob.venta) {
+
+    let compra = d.p2p_bob.compra;
+    let venta  = d.p2p_bob.venta;
+
+    compra = Math.floor(compra * 10) / 10;
+    venta  = Math.ceil(venta * 10) / 10;
+
+    document.getElementById("bcb_c").textContent =
+      "Bs " + compra.toFixed(1);
+
+    document.getElementById("bcb_v").textContent =
+      "Bs " + venta.toFixed(1);
+
+  } else {
+    document.getElementById("bcb_c").textContent = "--";
+    document.getElementById("bcb_v").textContent = "--";
+  }
+
+} catch (e) {
+  console.log("Error BCB:", e);
+}
+    
+// 💱 ARS → BOB
+if (d.p2p_bob && d.cripto_ars) {
+
+  let compra = d.p2p_bob.compra / d.cripto_ars.venta;
+  let venta  = d.p2p_bob.venta / d.cripto_ars.compra;
+
+  document.getElementById("arsbob_c").textContent =
+    "Bs " + compra.toFixed(5);
+
+  document.getElementById("arsbob_v").textContent =
+
+    "Bs " + venta.toFixed(5);
+} else {
+  document.getElementById("arsbob_c").textContent = "--";
+  document.getElementById("arsbob_v").textContent = "--";
+}
     // hora
     document.getElementById("hora").textContent =
       "Actualizado: " + new Date().toLocaleTimeString();
