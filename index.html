@@ -19,7 +19,12 @@ body {
   padding:15px;
   border-radius:12px;
 }
-
+.card1 {
+  background:#1e293b;
+  margin:10px;
+  padding:5px;
+  border-radius:8px;
+}
 .compra { color:#00ff99; }
 .venta { color:#ff4d4d; }
 
@@ -28,12 +33,15 @@ body {
 .equal { color:#aaa; }
 
 h2 { margin-top:20px; }
+
+
 </style>
 </head>
 
 <body>
 
 <h2>💰 Dólar en Vivo PRO</h2>
+
 
 <!-- BLUE -->
 <div class="card">
@@ -85,8 +93,32 @@ h2 { margin-top:20px; }
   <div class="venta">Venta: <span id="arsbob_v"></span></div>
 </div>
 <p id="hora"></p>
+<div class="card1">
+  👁
+  <img src="https://hits.sh/dolar-app-1.onrender.com.svg?style=flat-square&label=vts" />
+</div>
+
+<a href="https://wa.me/59167965805?text=Hola%20quiero%20hacer%20una%20transferencia"
+   target="_blank"
+   style="
+     position: fixed;
+     bottom: 10px;
+     right: 10px;
+     background: #25D366;
+     color: white;
+     padding: 15x 17px;
+     border-radius: 50px;
+     text-decoration: none;
+     font-family: Arial;
+     box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+   ">
+   💬 Conssultas.
+</a>
+
 
 <script>
+
+
 // 🔥 valores anteriores
 let prev = {
   blue: null,
@@ -167,6 +199,8 @@ if (d.cripto_ars) {
       document.getElementById("bob_v").textContent = "--";
     }
 
+
+
 // 🏦 BCB REFERENCIAL (SEGURO)
 try {
 
@@ -209,9 +243,11 @@ if (d.p2p_bob && d.cripto_ars) {
   document.getElementById("arsbob_c").textContent = "--";
   document.getElementById("arsbob_v").textContent = "--";
 }
+
     // hora
     document.getElementById("hora").textContent =
       "Actualizado: " + new Date().toLocaleTimeString();
+
 
   } catch (e) {
     console.log(e);
@@ -222,7 +258,11 @@ if (d.p2p_bob && d.cripto_ars) {
 // 🔥 iniciar
 cargar();
 setInterval(cargar, 5000);
+
 </script>
 
+<script data-goatcounter="https://oscarq.goatcounter.com/count"async src="//gc.zgo.at/count.js"></script>
 </body>
+
+
 </html>
