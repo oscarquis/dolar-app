@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Dolar en Vivo</string>
+    <string name="title_activity_main">Dolar en Vivo</string>
+    <string name="package_name">com.oscarquis.dolarenvivo</string>
+    <string name="custom_url_scheme">com.oscarquis.dolarenvivo</string>
+</resources>
