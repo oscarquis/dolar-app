@@ -521,7 +521,6 @@ app.get("/dolar", async(req,res)=>{
 
 
 const bcb = await getBCB();
-console.log("BCB:", bcb);    
 // =================================
     // CRIPTO
     // =================================
