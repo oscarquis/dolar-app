@@ -4,7 +4,7 @@
 
 const express = require("express");
 const cors = require("cors");
-
+const axios = require("axios");
 // FIX fetch node
 const fetch = (...args) =>
   import("node-fetch")
@@ -180,6 +180,48 @@ async function getP2P_ARS(){
 
     return null;
   }
+}
+// =====================================
+// bcb
+// =====================================
+async function getBCB(){
+
+  try{
+
+    const { data } = await axios.get(
+      "https://deudaexternapublica.bcb.gob.bo/publico/tipos-cambio/ultimos-indicadores",
+      {
+        headers:{
+          "User-Agent":"Mozilla/5.0"
+        }
+      }
+    );
+
+    const fecha =
+      data.match(/FECHA DE LA COTIZACIÓN:[\s\S]*?<strong><u>(.*?)<\/u>/i)?.[1]
+      ?.replace(/&eacute;/g,"é") || null;
+
+    const compra =
+      data.match(/ESTADOS UNIDOS[\s\S]*?DÓLAR COMPRA[\s\S]*?<td align="right">([\d,]+)<\/td>/i)?.[1]
+      ?.replace(",", ".");
+
+    const venta =
+      data.match(/ESTADOS UNIDOS[\s\S]*?DÓLAR VENTA[\s\S]*?<td align="right">([\d,]+)<\/td>/i)?.[1]
+      ?.replace(",", ".");
+
+    return {
+      compra,
+      venta,
+      fecha
+    };
+
+  }catch(e){
+
+    console.log(e);
+
+    return null;
+  }
+
 }
 
 // =====================================
@@ -472,8 +514,15 @@ app.get("/dolar", async(req,res)=>{
 
     const d1 =
       await r1.json();
-
     // =================================
+    // bcb
+    // =================================  
+
+
+
+const bcb = await getBCB();
+console.log("BCB:", bcb);    
+// =================================
     // CRIPTO
     // =================================
 
@@ -561,7 +610,7 @@ app.get("/dolar", async(req,res)=>{
       p2p_bob: p2p,
 
       ars_bob: ars_bob,
-
+bcb: bcb,
       anterior: anterior
     });
 

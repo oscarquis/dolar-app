@@ -306,6 +306,30 @@ v anterior:
 
 </div>
 
+
+<!-- Bcb -->
+
+<div class="card">
+
+<h3>🏛️ BCB Oficial</h3>
+
+<div class="compra">
+Compra:
+<span id="bcb_c"></span>
+</div>
+
+<div class="venta">
+Venta:
+<span id="bcb_v"></span>
+</div>
+
+<div class="small">
+Fecha:
+<span id="bcb_fecha"></span>
+</div>
+
+</div>
+
 <!-- ARS BOB -->
 
 <div class="card">
@@ -474,10 +498,11 @@ async function cargar(){
 
     const res =
       await fetch("https://www.dolarenvivo.com/dolar");
-
+					
     const d =
       await res.json();
-
+alert(JSON.stringify(d.bcb));
+console.log(d);
     // =====================
     // BLUE
     // =====================
@@ -692,6 +717,23 @@ async function cargar(){
             d.anterior.bob.venta;
       }
     }
+
+    // =====================
+    // bcb
+    // =====================
+if(d.bcb){
+
+    document.getElementById("bcb_c").textContent =
+        "Bs " + d.bcb.compra;
+
+    document.getElementById("bcb_v").textContent =
+        "Bs " + d.bcb.venta;
+
+    document.getElementById("bcb_fecha").textContent =
+        d.bcb.fecha;
+}
+
+
 
     // =====================
     // ARS → BOB
