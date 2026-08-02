@@ -47,7 +47,33 @@ content="Cotización del dólar en Bolivia en tiempo real. Precio de compra y ve
 content="dólar Bolivia, dólar hoy, dólar paralelo Bolivia, dólar blue, peso argentino, tipo de cambio Bolivia">
 <style>
 
+.menu{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:8px;
+    margin:15px 0;
+}
 
+.menu button{
+    background:#2563eb;
+    color:white;
+    border:none;
+    padding:10px 15px;
+    border-radius:8px;
+    cursor:pointer;
+}
+
+.panel{
+    display:none;
+    background:#1e293b;
+    color:white;
+    max-width:360px;
+    margin:10px auto;
+    padding:15px;
+    border-radius:10px;
+    text-align:left;
+}
 .modal{
   display:none;
   position:fixed;
@@ -147,7 +173,82 @@ a{
 
 
 </head>
+<!-- ===== MENÚ ===== -->
 
+<div class="menu">
+  <button onclick="toggleMenu('acerca')">ℹ️ Acerca de</button>
+  <button onclick="toggleMenu('uso')">❓ Cómo usar</button>
+  <button onclick="toggleMenu('glosario')">📚 Glosario</button>
+  <button onclick="toggleMenu('fuentes')">📊 Fuentes</button>
+  <button onclick="toggleMenu('contacto')">📞 Contacto</button>
+</div>
+
+<!-- ===== ACERCA ===== -->
+
+<div id="acerca" class="panel">
+  <h3>Acerca de Dólar en Vivo</h3>
+  <p>
+    Dólar en Vivo es una plataforma que muestra cotizaciones actualizadas
+    del dólar en Bolivia y Argentina, incluyendo dólar Blue, Oficial,
+    USDT, P2P y la referencia del Banco Central de Bolivia.
+  </p>
+</div>
+
+<!-- ===== CÓMO USAR ===== -->
+
+<div id="uso" class="panel">
+  <h3>Cómo usar</h3>
+
+  <p><b>Dólar Blue:</b> Cotización del mercado paralelo argentino.</p>
+
+  <p><b>Dólar Oficial:</b> Tipo de cambio oficial de Argentina.</p>
+
+  <p><b>USDT:</b> Precio del dólar digital.</p>
+
+  <p><b>P2P Bolivia:</b> Referencia del USDT en bolivianos.</p>
+
+  <p><b>BCB:</b> Tipo de cambio publicado por el Banco Central de Bolivia.</p>
+
+  <p><b>Peso → Bs:</b> Conversión estimada del peso argentino al boliviano.</p>
+</div>
+
+<!-- ===== GLOSARIO ===== -->
+
+<div id="glosario" class="panel">
+  <h3>Glosario</h3>
+
+  <p><b>Compra:</b> Precio al que se compra la divisa.</p>
+
+  <p><b>Venta:</b> Precio al que se vende la divisa.</p>
+
+  <p><b>P2P:</b> Compra y venta entre personas.</p>
+
+  <p><b>USDT:</b> Criptomoneda vinculada al dólar estadounidense.</p>
+</div>
+
+<!-- ===== FUENTES ===== -->
+
+<div id="fuentes" class="panel">
+  <h3>Fuentes de información</h3>
+
+  <ul>
+    <li>Banco Central de Bolivia (BCB).</li>
+    <li>Mercado P2P.</li>
+    <li>Cotizaciones de Argentina.</li>
+  </ul>
+
+  <p>Los datos son referenciales y pueden variar.</p>
+</div>
+
+<!-- ===== CONTACTO ===== -->
+
+<div id="contacto" class="panel">
+  <h3>Contacto</h3>
+
+  <p>WhatsApp: +591 67965805</p>
+
+  <p>https://www.dolarenvivo.com</p>
+</div>
 <body>
 
 <h2>
@@ -411,6 +512,29 @@ v anterior:
 
 <p id="hora"></p>
 <script>
+
+function toggleMenu(id){
+
+    let paneles = document.getElementsByClassName("panel");
+
+    for(let i=0;i<paneles.length;i++){
+
+        if(paneles[i].id!=id){
+            paneles[i].style.display="none";
+        }
+
+    }
+
+    let panel=document.getElementById(id);
+
+    if(panel.style.display=="block"){
+        panel.style.display="none";
+    }else{
+        panel.style.display="block";
+    }
+
+}
+
 function abrirCalc(){
   document.getElementById("modalCalc").style.display = "block";
 }
