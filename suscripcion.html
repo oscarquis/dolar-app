@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suscriptores - Dólar en Vivo</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#f3f4f6;
+  color:#222;
+}
+.container{
+  max-width:900px;
+  margin:20px auto;
+  padding:15px;
+}
+.card{
+  background:white;
+  border-radius:14px;
+  padding:18px;
+  box-shadow:0 2px 10px rgba(0,0,0,.08);
+}
+h2{margin-top:0;text-align:center}
+.top{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:15px;
+}
+button,a{
+  border:0;
+  border-radius:8px;
+  padding:10px 13px;
+  font-size:14px;
+  cursor:pointer;
+  text-decoration:none;
+}
+.actualizar{background:#2563eb;color:white}
+.nuevo{background:#16a34a;color:white}
+.editar{background:#f59e0b;color:white}
+.eliminar{background:#dc2626;color:white}
+table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:14px;
+}
+th,td{
+  padding:10px 7px;
+  border-bottom:1px solid #ddd;
+  text-align:left;
+}
+th{background:#f1f5f9}
+.activo{color:#15803d;font-weight:bold}
+.inactivo{color:#dc2626;font-weight:bold}
+.acciones{white-space:nowrap}
+.mensaje{
+  padding:10px;
+  margin-bottom:12px;
+  border-radius:8px;
+  display:none;
+}
+.ok{background:#dcfce7;color:#166534}
+.error{background:#fee2e2;color:#991b1b}
+
+.modal{
+  display:none;
+  position:fixed;
+  z-index:10;
+  inset:0;
+  background:rgba(0,0,0,.55);
+  align-items:center;
+  justify-content:center;
+  padding:15px;
+}
+.modal-box{
+  background:white;
+  width:100%;
+  max-width:420px;
+  border-radius:14px;
+  padding:20px;
+}
+label{
+  display:block;
+  margin-top:12px;
+  margin-bottom:5px;
+  font-weight:bold;
+}
+input,select{
+  width:100%;
+  padding:11px;
+  border:1px solid #ccc;
+  border-radius:8px;
+  font-size:16px;
+}
+.modal-buttons{
+  display:flex;
+  gap:8px;
+  margin-top:18px;
+}
+.guardar{background:#16a34a;color:white;flex:1}
+.cancelar{background:#6b7280;color:white;flex:1}
+
+@media(max-width:650px){
+  table{font-size:12px}
+  th:nth-child(4),td:nth-child(4){display:none}
+  .acciones button{display:block;width:100%;margin:3px 0}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <div class="card">
+    <h2>📱 Suscriptores WhatsApp</h2>
+
+    <div id="mensaje" class="mensaje"></div>
+
+    <div class="top">
+      <button class="actualizar" onclick="cargarSuscriptores()">🔄 Actualizar</button>
+      <a class="nuevo" href="suscripcion.html">➕ Nuevo suscriptor</a>
+    </div>
+
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Teléfono</th>
+            <th>Variación</th>
+            <th>Estado</th>
+            <th>Última alerta</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="lista">
+          <tr><td colspan="5">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MODIFICAR -->
+<div id="modal" class="modal">
+  <div class="modal-box">
+    <h3>✏️ Modificar suscriptor</h3>
+
+    <label>Teléfono</label>
+    <input id="editTelefono" type="text" readonly>
+
+    <label>Variación para alerta (%)</label>
+    <input id="editVariacion" type="number" min="0.1" max="100" step="0.1">
+
+    <label>Estado</label>
+    <select id="editActivo">
+      <option value="true">Activo</option>
+      <option value="false">Inactivo</option>
+    </select>
+
+    <div class="modal-buttons">
+      <button class="guardar" onclick="guardarCambios()">💾 Guardar</button>
+      <button class="cancelar" onclick="cerrarModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://tjqlwmtxzwqdjziqukcc.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqcWx3bXR4endxZGp6aXF1a2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2OTM3NTMsImV4cCI6MjA5NDI2OTc1M30.8cojvxD4NzULayU5VvhQCfrehiXWeji05UdtCFnIgSA";
+
+const tabla = "suscriptores_whatsapp";
+
+function mostrarMensaje(texto, tipo="ok"){
+  const m = document.getElementById("mensaje");
+  m.textContent = texto;
+  m.className = "mensaje " + tipo;
+  m.style.display = "block";
+  setTimeout(()=>m.style.display="none",3000);
+}
+
+function escapar(texto){
+  return String(texto ?? "")
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+}
+
+async function cargarSuscriptores(){
+  const lista = document.getElementById("lista");
+  lista.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+
+  try{
+    const respuesta = await fetch(
+      `${SUPABASE_URL}/rest/v1/${tabla}?select=telefono,variacion_alerta,activo,ultima_alerta&order=telefono.asc`,
+      {
+        headers:{
+          "apikey":SUPABASE_KEY,
+          "Authorization":"Bearer "+SUPABASE_KEY
+        }
+      }
+    );
+
+    if(!respuesta.ok){
+      throw new Error("Error HTTP "+respuesta.status);
+    }
+
+    const datos = await respuesta.json();
+
+    if(!datos.length){
+      lista.innerHTML='<tr><td colspan="5">No hay suscriptores.</td></tr>';
+      return;
+    }
+
+    lista.innerHTML = datos.map(s => `
+      <tr>
+        <td>${escapar(s.telefono)}</td>
+        <td>${escapar(s.variacion_alerta)}%</td>
+        <td class="${s.activo ? "activo" : "inactivo"}">
+          ${s.activo ? "Activo" : "Inactivo"}
+        </td>
+        <td>${s.ultima_alerta ? escapar(new Date(s.ultima_alerta).toLocaleString()) : "—"}</td>
+        <td class="acciones">
+          <button class="editar"
+            onclick='abrirEditar(${JSON.stringify(s.telefono)}, ${Number(s.variacion_alerta)}, ${Boolean(s.activo)})'>
+            ✏️ Modificar
+          </button>
+          <button class="eliminar"
+            onclick='eliminarSuscriptor(${JSON.stringify(s.telefono)})'>
+            🗑️ Eliminar
+          </button>
+        </td>
+      </tr>
+    `).join("");
+
+  }catch(error){
+    console.error(error);
+    lista.innerHTML='<tr><td colspan="5">No se pudo cargar la lista.</td></tr>';
+    mostrarMensaje("Error al cargar los suscriptores","error");
+  }
+}
+
+function abrirEditar(telefono, variacion, activo){
+  document.getElementById("editTelefono").value = telefono;
+  document.getElementById("editVariacion").value = variacion;
+  document.getElementById("editActivo").value = activo ? "true" : "false";
+  document.getElementById("modal").style.display = "flex";
+}
+
+function cerrarModal(){
+  document.getElementById("modal").style.display = "none";
+}
+
+async function guardarCambios(){
+  const telefono = document.getElementById("editTelefono").value;
+  const variacion = Number(document.getElementById("editVariacion").value);
+  const activo = document.getElementById("editActivo").value === "true";
+
+  if(!telefono){
+    mostrarMensaje("Falta el teléfono","error");
+    return;
+  }
+
+  if(!Number.isFinite(variacion) || variacion < 0.1 || variacion > 100){
+    mostrarMensaje("La variación debe estar entre 0.1% y 100%","error");
+    return;
+  }
+
+  try{
+    const respuesta = await fetch(
+      `${SUPABASE_URL}/rest/v1/${tabla}?telefono=eq.${encodeURIComponent(telefono)}`,
+      {
+        method:"PATCH",
+        headers:{
+          "apikey":SUPABASE_KEY,
+          "Authorization":"Bearer "+SUPABASE_KEY,
+          "Content-Type":"application/json",
+          "Prefer":"return=minimal"
+        },
+        body:JSON.stringify({
+          variacion_alerta:variacion,
+          activo:activo
+        })
+      }
+    );
+
+    if(!respuesta.ok){
+      const texto = await respuesta.text();
+      throw new Error(texto || "Error al modificar");
+    }
+
+    cerrarModal();
+    mostrarMensaje("✅ Suscriptor modificado correctamente");
+    cargarSuscriptores();
+
+  }catch(error){
+    console.error(error);
+    mostrarMensaje("❌ No se pudo modificar el suscriptor","error");
+  }
+}
+
+async function eliminarSuscriptor(telefono){
+  const confirmar = confirm(
+    "¿Seguro que quieres eliminar este suscriptor?\\n\\n" +
+    telefono +
+    "\\n\\nEsta acción no se puede deshacer."
+  );
+
+  if(!confirmar) return;
+
+  try{
+    const respuesta = await fetch(
+      `${SUPABASE_URL}/rest/v1/${tabla}?telefono=eq.${encodeURIComponent(telefono)}`,
+      {
+        method:"DELETE",
+        headers:{
+          "apikey":SUPABASE_KEY,
+          "Authorization":"Bearer "+SUPABASE_KEY,
+          "Prefer":"return=minimal"
+        }
+      }
+    );
+
+    if(!respuesta.ok){
+      const texto = await respuesta.text();
+      throw new Error(texto || "Error al eliminar");
+    }
+
+    mostrarMensaje("✅ Suscriptor eliminado correctamente");
+    cargarSuscriptores();
+
+  }catch(error){
+    console.error(error);
+    mostrarMensaje("❌ No se pudo eliminar el suscriptor","error");
+  }
+}
+
+document.getElementById("modal").addEventListener("click",function(e){
+  if(e.target === this) cerrarModal();
+});
+
+cargarSuscriptores();
+</script>
+</body>
+</html>
