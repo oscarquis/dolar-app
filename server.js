@@ -576,44 +576,50 @@ async function getP2P_ARS(){
 // =====================================
 
 async function getBCB(){
-
-  try{
-
+  try {
     const { data } = await axios.get(
-      "https://deudaexternapublica.bcb.gob.bo/publico/tipos-cambio/ultimos-indicadores",
+      "https://www.bcb.gob.bo/",
       {
-        headers:{
-          "User-Agent":"Mozilla/5.0"
-        }
+        headers: {
+          "User-Agent": "Mozilla/5.0",
+          "Accept": "text/html"
+        },
+        timeout: 15000
       }
     );
 
-    const fecha =
-      data.match(/FECHA DE LA COTIZACIÓN:[\s\S]*?<strong><u>(.*?)<\/u>/i)?.[1]
-      ?.replace(/&eacute;/g,"é") || null;
+    const valorTexto = data.match(
+      /<span[^>]*class=["'][^"']*\bbcb-tco-num\b[^"']*["'][^>]*>\s*([\d.,]+)\s*<\/span>/i
+    )?.[1];
 
-    const compra =
-      data.match(/ESTADOS UNIDOS[\s\S]*?DÓLAR COMPRA[\s\S]*?<td align="right">([\d,]+)<\/td>/i)?.[1]
-      ?.replace(",", ".");
+    const fechaMatch = data.match(
+      /<div[^>]*class=["'][^"']*\bbcb-kpi2-asof\b[^"']*["'][^>]*>[\s\S]*?<time[^>]*datetime=["']([^"']+)["'][^>]*>([\s\S]*?)<\/time>/i
+    );
 
-    const venta =
-      data.match(/ESTADOS UNIDOS[\s\S]*?DÓLAR VENTA[\s\S]*?<td align="right">([\d,]+)<\/td>/i)?.[1]
-      ?.replace(",", ".");
+    const valor = valorTexto
+      ? Number(valorTexto.replace(/\./g, "").replace(",", "."))
+      : NaN;
+
+    const vigencia = fechaMatch?.[2]
+      ?.replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim() || null;
+
+    if (!Number.isFinite(valor) || valor <= 0) {
+      console.error("BCB: no se encontró el tipo de cambio oficial.");
+      return null;
+    }
 
     return {
-      compra,
-      venta,
-      fecha
+      tipo_cambio_oficial: valor,
+      fecha: fechaMatch?.[1] || null,
+      vigencia
     };
 
-  }catch(e){
-
-    console.log(e);
-
+  } catch (e) {
+    console.error("Error consultando BCB:", e.message);
     return null;
-
   }
-
 }
 
 // =====================================

@@ -408,24 +408,19 @@ v anterior:
 </div>
 
 
-<!-- Bcb -->
+<!-- BCB: Tipo de cambio oficial -->
 
 <div class="card">
 
-<h3>🏛️ Dolar BCB Oficial</h3>
-
-<div class="compra">
-Compra:
-<span id="bcb_c"></span>
-</div>
+<h3>🏛️ Dólar BCB Oficial</h3>
 
 <div class="venta">
-Venta:
-<span id="bcb_v"></span>
+Tipo de cambio:
+<strong id="bcb_oficial"></strong>
 </div>
 
 <div class="small">
-Fecha:
+Vigencia:
 <span id="bcb_fecha"></span>
 </div>
 
@@ -877,19 +872,21 @@ console.log(d);
     }
 
     // =====================
-    // bcb
+    // BCB: tipo de cambio oficial
     // =====================
-if(d.bcb){
+    const bcbOficial = document.getElementById("bcb_oficial");
+    const bcbFecha = document.getElementById("bcb_fecha");
 
-    document.getElementById("bcb_c").textContent =
-        "Bs " + d.bcb.compra;
+    if (d.bcb && d.bcb.tipo_cambio_oficial != null) {
+        bcbOficial.textContent =
+            "Bs " + Number(d.bcb.tipo_cambio_oficial).toFixed(2);
 
-    document.getElementById("bcb_v").textContent =
-        "Bs " + d.bcb.venta;
-
-    document.getElementById("bcb_fecha").textContent =
-        d.bcb.fecha;
-}
+        bcbFecha.textContent =
+            d.bcb.vigencia || d.bcb.fecha || "";
+    } else {
+        bcbOficial.textContent = "No disponible";
+        bcbFecha.textContent = "";
+    }
 
 
 
