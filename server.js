@@ -1070,6 +1070,139 @@ app.get("/dolar", async(req,res)=>{
 
 });
 
+
+// =====================================
+// BINANCE P2P: anuncios Merchant para la página arbitraje-p2p.html
+// Endpoint consumido por la calculadora desde el mismo servidor.
+// =====================================
+const BINANCE_P2P_BASE = "https://www.binance.com";
+const BINANCE_P2P_ENDPOINT = "/bapi/c2c/v1/public/c2c/agent/ad-list";
+const BINANCE_P2P_CACHE_MS = 20000;
+const binanceP2pCache = new Map();
+
+function binanceNumber(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function binanceUnwrap(payload) {
+  const candidates = [
+    payload?.data, payload?.data?.list, payload?.data?.ads,
+    payload?.data?.items, payload?.data?.data, payload?.data?.data?.list,
+    payload?.list, payload?.ads
+  ];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+  return Array.isArray(payload) ? payload : [];
+}
+
+function binanceNormalize(raw) {
+  const adv = raw.adv || raw.ad || raw.advertisement || raw;
+  const advertiser = raw.advertiser || adv.advertiser || raw.user || adv.user || {};
+  const userType = String(advertiser.userType || raw.userType || adv.userType || "").toLowerCase();
+  const classify = String(adv.classify || raw.classify || "").toLowerCase();
+
+  // No mostrar usuarios comunes: solo Merchant explícitamente identificado.
+  const isMerchant =
+    userType === "merchant" ||
+    userType === "pro_merchant" ||
+    classify === "profession";
+
+  const methods = adv.tradeMethods || adv.payTypes || raw.tradeMethods || raw.payTypes || [];
+  return {
+    merchant: String(advertiser.nickName || advertiser.nickname || raw.nickName || adv.nickName || "Merchant Binance"),
+    userType,
+    classify,
+    isMerchant,
+    price: binanceNumber(adv.price ?? raw.price),
+    min: binanceNumber(adv.minSingleTransAmount ?? adv.minAmount ?? raw.minSingleTransAmount ?? raw.minAmount),
+    max: binanceNumber(adv.maxSingleTransAmount ?? adv.maxAmount ?? raw.maxSingleTransAmount ?? raw.maxAmount),
+    orders30d: binanceNumber(advertiser.monthOrderCount ?? raw.monthOrderCount),
+    completion30d: binanceNumber(advertiser.monthFinishRate ?? raw.monthFinishRate),
+    totalOrders: binanceNumber(advertiser.orderCount ?? raw.orderCount),
+    methods: Array.isArray(methods)
+      ? methods.map(x => typeof x === "string" ? x : (x.tradeMethodName || x.identifier || x.payType || "")).filter(Boolean)
+      : [],
+    available: binanceNumber(adv.surplusAmount ?? adv.availableAmount ?? raw.surplusAmount),
+    advNo: adv.advNo || raw.advNo || raw.id || null
+  };
+}
+
+async function fetchBinanceP2PAds(fiat, tradeType) {
+  const cacheKey = `${fiat}:${tradeType}`;
+  const cached = binanceP2pCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < BINANCE_P2P_CACHE_MS) return cached.value;
+
+  const url = new URL(BINANCE_P2P_ENDPOINT, BINANCE_P2P_BASE);
+  url.searchParams.set("fiat", fiat);
+  url.searchParams.set("asset", "USDT");
+  url.searchParams.set("tradeType", tradeType);
+  url.searchParams.set("limit", "20");
+  url.searchParams.set("order", tradeType === "BUY" ? "price_asc" : "price_desc");
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      "accept": "application/json, text/plain, */*",
+      "content-type": "application/json",
+      "user-agent": "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36",
+      "origin": BINANCE_P2P_BASE,
+      "referer": "https://www.binance.com/"
+    },
+    signal: AbortSignal.timeout(12000)
+  });
+
+  if (!response.ok) throw new Error(`Binance respondió HTTP ${response.status} para ${fiat}/${tradeType}`);
+  const payload = await response.json();
+
+  if (payload.success === false || (payload.code && payload.code !== "000000" && payload.code !== "0")) {
+    throw new Error(payload.message || payload.msg || `Respuesta Binance: ${payload.code}`);
+  }
+
+  const all = binanceUnwrap(payload).map(binanceNormalize);
+  const merchants = all.filter(x => x.isMerchant && x.price !== null);
+  const result = {
+    fiat, tradeType,
+    countReceived: all.length,
+    countMerchants: merchants.length,
+    ads: merchants
+  };
+  binanceP2pCache.set(cacheKey, { at: Date.now(), value: result });
+  return result;
+}
+
+async function getBinanceP2PMarket() {
+  const pairs = await Promise.all([
+    fetchBinanceP2PAds("ARS", "BUY"),
+    fetchBinanceP2PAds("ARS", "SELL"),
+    fetchBinanceP2PAds("BOB", "BUY"),
+    fetchBinanceP2PAds("BOB", "SELL")
+  ]);
+  const markets = Object.fromEntries(pairs.map(x => [`${x.fiat}_${x.tradeType}`, x]));
+  return {
+    ok: true,
+    source: "Binance public P2P ads",
+    fetchedAt: new Date().toISOString(),
+    filter: "Solo Merchant identificados explícitamente; usuarios comunes excluidos",
+    markets
+  };
+}
+
+app.get("/api/ads", async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store");
+    res.json(await getBinanceP2PMarket());
+  } catch (e) {
+    console.error("Error consultando Binance P2P:", e.message);
+    res.status(502).json({
+      ok: false,
+      error: e.message,
+      hint: "Binance pudo cambiar o limitar la consulta pública. No se muestran usuarios comunes como sustituto."
+    });
+  }
+});
+
+
 // =====================================
 // PUERTO
 // =====================================
