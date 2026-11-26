@@ -1116,16 +1116,16 @@ function binanceNormalize(raw) {
     classify,
     isMerchant,
     price: binanceNumber(adv.price ?? raw.price),
-    min: binanceNumber(adv.minSingleTransAmount ?? adv.minAmount ?? raw.minSingleTransAmount ?? raw.minAmount),
-    max: binanceNumber(adv.maxSingleTransAmount ?? adv.maxAmount ?? raw.maxSingleTransAmount ?? raw.maxAmount),
+    min: binanceNumber(adv.minTransAmount ?? adv.minSingleTransAmount ?? adv.minAmount ?? raw.minTransAmount ?? raw.minSingleTransAmount ?? raw.minAmount),
+    max: binanceNumber(adv.maxTransAmount ?? adv.maxSingleTransAmount ?? adv.maxAmount ?? raw.maxTransAmount ?? raw.maxSingleTransAmount ?? raw.maxAmount),
     orders30d: binanceNumber(advertiser.monthOrderCount ?? raw.monthOrderCount),
     completion30d: binanceNumber(advertiser.monthFinishRate ?? raw.monthFinishRate),
     totalOrders: binanceNumber(advertiser.orderCount ?? raw.orderCount),
     methods: Array.isArray(methods)
       ? methods.map(x => typeof x === "string" ? x : (x.tradeMethodName || x.identifier || x.payType || "")).filter(Boolean)
       : [],
-    available: binanceNumber(adv.surplusAmount ?? adv.availableAmount ?? raw.surplusAmount),
-    advNo: adv.advNo || raw.advNo || raw.id || null
+    available: binanceNumber(adv.tradableAmount ?? adv.surplusAmount ?? adv.availableAmount ?? raw.tradableAmount ?? raw.surplusAmount),
+    advNo: adv.adNo || adv.advNo || raw.adNo || raw.advNo || raw.id || null
   };
 }
 
