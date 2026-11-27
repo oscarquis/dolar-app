@@ -81,6 +81,45 @@ const supabase = createClient(
 // =====================================
 
 app.use(express.static(__dirname));
+
+// =====================================
+// CONSULTAR COTIZACIÓN ARS / BOB
+// =====================================
+
+app.get("/api/cotizacion/ars-bob", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("cotizaciones")
+      .select("compra, venta, fecha")
+      .eq("moneda", "ars_bob")
+      .order("fecha", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!data) {
+      return res.status(404).json({
+        ok: false,
+        error: "No existe cotización ARS/BOB en Supabase"
+      });
+    }
+
+    res.json({
+      ok: true,
+      moneda: "ars_bob",
+      cotizacion: data
+    });
+
+  } catch (error) {
+    console.error("Error consultando ARS/BOB:", error);
+
+    res.status(500).json({
+      ok: false,
+      error: error.message
+    });
+  }
+});
 // =====================================
 // PRUEBA SUPABASE
 // =====================================
@@ -1097,35 +1136,81 @@ function binanceUnwrap(payload) {
   return Array.isArray(payload) ? payload : [];
 }
 
+
 function binanceNormalize(raw) {
   const adv = raw.adv || raw.ad || raw.advertisement || raw;
   const advertiser = raw.advertiser || adv.advertiser || raw.user || adv.user || {};
-  const userType = String(advertiser.userType || raw.userType || adv.userType || "").toLowerCase();
-  const classify = String(adv.classify || raw.classify || "").toLowerCase();
 
-  // No mostrar usuarios comunes: solo Merchant explícitamente identificado.
+  const userType = String(
+    advertiser.userType || raw.userType || adv.userType || ""
+  ).toLowerCase();
+
+  const classify = String(
+    adv.classify || raw.classify || ""
+  ).toLowerCase();
+
+  // Mostrar solamente anuncios Merchant identificados explícitamente.
   const isMerchant =
     userType === "merchant" ||
     userType === "pro_merchant" ||
     classify === "profession";
 
-  const methods = adv.tradeMethods || adv.payTypes || raw.tradeMethods || raw.payTypes || [];
+  const methods =
+    adv.tradeMethods || adv.payTypes ||
+    raw.tradeMethods || raw.payTypes || [];
+
   return {
-    merchant: String(advertiser.nickName || advertiser.nickname || raw.nickName || adv.nickName || "Merchant Binance"),
+    merchant: String(
+      advertiser.nickName ||
+      advertiser.nickname ||
+      raw.nickName ||
+      adv.nickName ||
+      "Merchant Binance"
+    ),
+
     userType,
     classify,
     isMerchant,
+
     price: binanceNumber(adv.price ?? raw.price),
-    min: binanceNumber(adv.minTransAmount ?? adv.minSingleTransAmount ?? adv.minAmount ?? raw.minTransAmount ?? raw.minSingleTransAmount ?? raw.minAmount),
-    max: binanceNumber(adv.maxTransAmount ?? adv.maxSingleTransAmount ?? adv.maxAmount ?? raw.maxTransAmount ?? raw.maxSingleTransAmount ?? raw.maxAmount),
-    orders30d: binanceNumber(advertiser.monthOrderCount ?? raw.monthOrderCount),
-    completion30d: binanceNumber(advertiser.monthFinishRate ?? raw.monthFinishRate),
-    totalOrders: binanceNumber(advertiser.orderCount ?? raw.orderCount),
+
+    // Límites de cada operación expresados en moneda fiat.
+    min: binanceNumber(
+      adv.minSingleTransAmount ?? raw.minSingleTransAmount
+    ),
+
+    max: binanceNumber(
+      adv.maxSingleTransAmount ?? raw.maxSingleTransAmount
+    ),
+
+    orders30d: binanceNumber(
+      advertiser.monthOrderCount ?? raw.monthOrderCount
+    ),
+
+    completion30d: binanceNumber(
+      advertiser.monthFinishRate ?? raw.monthFinishRate
+    ),
+
+    totalOrders: binanceNumber(
+      advertiser.orderCount ?? raw.orderCount
+    ),
+
     methods: Array.isArray(methods)
-      ? methods.map(x => typeof x === "string" ? x : (x.tradeMethodName || x.identifier || x.payType || "")).filter(Boolean)
+      ? methods.map(x =>
+          typeof x === "string"
+            ? x
+            : (x.tradeMethodName || x.identifier || x.payType || "")
+        ).filter(Boolean)
       : [],
-    available: binanceNumber(adv.tradableAmount ?? adv.surplusAmount ?? adv.availableAmount ?? raw.tradableAmount ?? raw.surplusAmount),
-    advNo: adv.adNo || adv.advNo || raw.adNo || raw.advNo || raw.id || null
+
+    // Cantidad de USDT disponible.
+    available: binanceNumber(
+      adv.surplusAmount ?? raw.surplusAmount
+    ),
+
+    advNo:
+      adv.adNo || adv.advNo ||
+      raw.adNo || raw.advNo || raw.id || null
   };
 }
 

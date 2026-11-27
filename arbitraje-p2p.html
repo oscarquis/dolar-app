@@ -11,16 +11,313 @@
 <p class="muted">Esta herramienta solo consulta y calcula. No crea órdenes, no envía pagos ni libera USDT. Los precios y límites pueden cambiar; verifica en Binance antes de operar. El endpoint público puede cambiar o limitarse.</p></main>
 <script>
 let market=null,timer=null;
+
+async function cargarCotizacionSupabase(){
+  const r = await fetch('/api/cotizacion/ars-bob');
+  const data = await r.json();
+
+  if(!r.ok || !data.ok){
+    throw new Error(data.error || 'No se pudo consultar Supabase');
+  }
+
+  const compra = Number(data.cotizacion.compra);
+  const venta = Number(data.cotizacion.venta);
+
+  if(!Number.isFinite(compra) || !Number.isFinite(venta) || compra<=0 || venta<=0){
+    throw new Error('Cotización ARS/BOB inválida');
+  }
+
+  $('arsBuyRate').value = compra;
+  $('arsSellRate').value = venta;
+
+  return data.cotizacion;
+}
 const $=id=>document.getElementById(id), n=id=>Number($(id).value)||0, fmt=(v,d=2)=>Number(v).toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});
-function best(side,fiat,amount){const list=market?.markets?.[`${fiat}_${side}`]?.ads||[];const eligible=list.filter(a=>(a.min==null||amount>=a.min)&&(a.max==null||amount<=a.max));if(!eligible.length)return null;eligible.sort((a,b)=>side==='BUY'?a.price-b.price:b.price-a.price);return eligible[0]}
+
+
+
+function best(side, fiat, amount) {
+  const list = market?.markets?.[`${fiat}_${side}`]?.ads || [];
+
+  const eligible = list.map(a => {
+    const price = Number(a.price);
+    const minFiat = a.min == null ? 0 : Number(a.min);
+    const maxFiat = a.max == null ? Infinity : Number(a.max);
+    const available = a.available == null ? Infinity : Number(a.available);
+
+    if (
+      !Number.isFinite(price) || price <= 0 ||
+      !Number.isFinite(minFiat) || minFiat < 0 ||
+      Number.isNaN(maxFiat) || maxFiat < minFiat ||
+      Number.isNaN(available) || available < 0
+    ) return null;
+
+    // Convertir los límites fiat a cantidad de USDT.
+    const minUSDT = minFiat / price;
+    const maxUSDT = maxFiat / price;
+
+    // Capital disponible para comprar USDT.
+    const capitalUSDT = amount > 0 ? amount / price : 0;
+
+    const usableUSDT = Math.min(
+      maxUSDT,
+      available,
+      capitalUSDT
+    );
+
+    if (usableUSDT < minUSDT) return null;
+
+    return {
+      ...a,
+      minUSDT,
+      maxUSDT,
+      usableUSDT
+    };
+  }).filter(Boolean);
+
+  eligible.sort((a, b) =>
+    side === 'BUY'
+      ? a.price - b.price
+      : b.price - a.price
+  );
+
+  return eligible[0] || null;
+}
+
 function adHtml(a,fiat){if(!a)return '<div class="ad">No se encontró anuncio Merchant elegible.</div>';return `<div class="ad"><span class="tag">MERCHANT</span><div class="price">${fmt(a.price,fiat==='ARS'?2:3)} ${fiat}</div><b>${esc(a.merchant)}</b><div class="small">Límites: ${a.min==null?'—':fmt(a.min)} a ${a.max==null?'—':fmt(a.max)} ${fiat}</div><div class="small">Órdenes 30 días: ${a.orders30d??'—'} · Cumplimiento: ${a.completion30d==null?'—':fmt(a.completion30d,1)+'%'}</div><div class="small">Pago: ${esc((a.methods||[]).join(', ')||'No informado')}</div></div>`}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-async function refresh(){ $('state').textContent='Consultando…';$('adError').hidden=true;try{const r=await fetch('/api/ads');const data=await r.json();if(!r.ok||!data.ok)throw new Error(data.error||'No se pudo consultar Binance');market=data;$('updated').textContent='Última consulta: '+new Date(data.fetchedAt).toLocaleString();$('state').textContent='Conectado';renderAds();calculate();}catch(e){$('state').textContent='Error';$('adError').hidden=false;$('adError').textContent=e.message;$('decision').textContent='No se actualizó el mercado. Se mantienen los últimos datos solo si ya estaban cargados; no operes con precios antiguos.';}}
+async function refresh(){
+  $('state').textContent='Consultando Binance y Supabase…';
+  $('adError').hidden=true;
+
+  try{
+    const [rAds, cotizacion] = await Promise.all([
+      fetch('/api/ads'),
+      cargarCotizacionSupabase()
+    ]);
+
+    const data = await rAds.json();
+
+    if(!rAds.ok || !data.ok){
+      throw new Error(data.error || 'Error consultando Binance');
+    }
+
+    market=data;
+
+    $('updated').textContent=
+      'Última consulta: '+new Date(data.fetchedAt).toLocaleString();
+
+    $('state').textContent='Binance y Supabase conectados';
+
+    renderAds();
+    calculate();
+
+  }catch(e){
+    $('state').textContent='Error';
+    $('adError').hidden=false;
+    $('adError').textContent=e.message;
+    $('decision').textContent=
+      'No se pudo actualizar el mercado o la cotización. No operes con datos antiguos.';
+  }
+}
 function renderAds(){const arBuy=best('BUY','ARS',n('capitalArs')),arSell=best('SELL','ARS',n('capitalArs')),boBuy=best('BUY','BOB',n('capitalBob')),boSell=best('SELL','BOB',n('capitalBob'));$('arsBuy').innerHTML=adHtml(arBuy,'ARS');$('arsSell').innerHTML=adHtml(arSell,'ARS');$('bobBuy').innerHTML=adHtml(boBuy,'BOB');$('bobSell').innerHTML=adHtml(boSell,'BOB');let out=[];for(const [k,v] of Object.entries(market.markets)){out.push(`<h3>${k.replace('_',' · ')}</h3><p class="small">Anuncios recibidos: ${v.countReceived} · Merchant detectados: ${v.countMerchants}</p>`);for(const a of v.ads.slice(0,5))out.push(`<div class="row"><span>${esc(a.merchant)} · ${a.completion30d==null?'—':fmt(a.completion30d,1)+'%'}</span><span>${fmt(a.price,k.startsWith('ARS')?2:3)}</span></div>`)}$('listing').innerHTML=out.join('')}
-function calculate(){if(!market)return;const arBuy=best('BUY','ARS',n('capitalArs')),arSell=best('SELL','ARS',n('capitalArs')),boBuy=best('BUY','BOB',n('capitalBob')),boSell=best('SELL','BOB',n('capitalBob'));const cb=n('arsBuyRate'),cs=n('arsSellRate'),fee=n('fee')/100,cost=n('cost'),ca=n('capitalArs'),cbo=n('capitalBob');let results=[];
-if(arBuy&&boSell&&cb>0){const usdt=ca/arBuy.price,bob=usdt*boSell.price*(1-fee),arsEnd=bob/cb*(1-fee)-cost/cb,profit=arsEnd-ca,pct=profit/ca*100;$('aProfit').textContent=(profit>=0?'+':'')+fmt(profit)+' ARS ('+(pct>=0?'+':'')+fmt(pct,3)+'%)';$('aProfit').className='price '+(profit>=0?'green':'red');$('aDetail').textContent=`${fmt(usdt,4)} USDT → ${fmt(bob)} BOB → ${fmt(arsEnd)} ARS · Equiv. ${fmt(profit*cb)} BOB / ${fmt(profit/arBuy.price,4)} USDT`;results.push({name:'A',pct,profit});}else{$('aProfit').textContent='Sin anuncios elegibles';$('aDetail').textContent='Se necesita anuncio Merchant para comprar en ARS y vender en BOB.'}
-if(boBuy&&arSell&&cs>0){const usdt=cbo/boBuy.price,ars=usdt*arSell.price*(1-fee),bobEnd=ars*cs*(1-fee)-cost,profit=bobEnd-cbo,pct=profit/cbo*100;$('bProfit').textContent=(profit>=0?'+':'')+fmt(profit)+' BOB ('+(pct>=0?'+':'')+fmt(pct,3)+'%)';$('bProfit').className='price '+(profit>=0?'green':'red');$('bDetail').textContent=`${fmt(usdt,4)} USDT → ${fmt(ars)} ARS → ${fmt(bobEnd)} BOB · Equiv. ${fmt(profit/cs)} ARS / ${fmt(profit/boBuy.price,4)} USDT`;results.push({name:'B',pct,profit});}else{$('bProfit').textContent='Sin anuncios elegibles';$('bDetail').textContent='Se necesita anuncio Merchant para comprar en BOB y vender en ARS.'}
-if(!results.length)$('decision').textContent='No hay suficientes anuncios Merchant que coincidan con tus capitales y límites.';else{results.sort((a,b)=>b.pct-a.pct);const top=results[0];$('decision').textContent=top.pct>0?`La ruta ${top.name} tiene el mayor margen estimado (${fmt(top.pct,3)}%). Comprueba límites, método de pago y precio final en Binance antes de operar.`:'Con los precios Merchant disponibles, ninguna ruta muestra ganancia. Espera mejores cotizaciones.'}}
+
+
+
+function calculate() {
+  if (!market) return;
+
+  const cb = n('arsBuyRate');
+  const cs = n('arsSellRate');
+  const fee = n('fee') / 100;
+  const cost = n('cost');
+
+  const capitalArs = n('capitalArs');
+  const capitalBob = n('capitalBob');
+
+  let results = [];
+
+  // Prepara anuncios con límites convertidos a USDT.
+  function candidatos(fiat, side, capital) {
+    const list = market?.markets?.[`${fiat}_${side}`]?.ads || [];
+
+    return list.map(a => {
+      const price = Number(a.price);
+      const minFiat = a.min == null ? 0 : Number(a.min);
+      const maxFiat = a.max == null ? Infinity : Number(a.max);
+      const available = a.available == null ? Infinity : Number(a.available);
+
+      if (
+        !Number.isFinite(price) || price <= 0 ||
+        !Number.isFinite(minFiat) || minFiat < 0 ||
+        Number.isNaN(maxFiat) || maxFiat < minFiat ||
+        Number.isNaN(available) || available <= 0
+      ) return null;
+
+      return {
+        ...a,
+        minUSDT: minFiat / price,
+        maxUSDT: maxFiat / price,
+        availableUSDT: available,
+        capitalUSDT: capital > 0 ? capital / price : 0
+      };
+    }).filter(Boolean);
+  }
+
+  // Busca la mejor pareja compatible de anuncios.
+  function mejorPareja(fiatCompra, fiatVenta, capital) {
+    const compras = candidatos(fiatCompra, 'BUY', capital);
+    const ventas = candidatos(fiatVenta, 'SELL', Infinity);
+
+    let mejor = null;
+
+    for (const compra of compras) {
+      for (const venta of ventas) {
+
+        const minimo = Math.max(
+          compra.minUSDT,
+          venta.minUSDT
+        );
+
+        const maximo = Math.min(
+          compra.maxUSDT,
+          compra.availableUSDT,
+          compra.capitalUSDT,
+          venta.maxUSDT,
+          venta.availableUSDT
+        );
+
+        if (maximo < minimo || maximo <= 0) continue;
+
+        const usdt = maximo;
+
+        const resultado = {
+          compra,
+          venta,
+          usdt
+        };
+
+        if (!mejor || usdt > mejor.usdt) {
+          mejor = resultado;
+        }
+      }
+    }
+
+    return mejor;
+  }
+
+  // Ruta A: comprar USDT en ARS y vender USDT en BOB.
+  if (cb > 0 && capitalArs > 0) {
+    const pareja = mejorPareja('ARS', 'BOB', capitalArs);
+
+    if (pareja) {
+      const { compra, venta, usdt } = pareja;
+
+      const invertido = usdt * compra.price;
+      const bob = usdt * venta.price * (1 - fee);
+      const arsEnd = bob / cb * (1 - fee) - cost / cb;
+
+      const profit = arsEnd - invertido;
+      const pct = profit / invertido * 100;
+
+      $('aProfit').textContent =
+        (profit >= 0 ? '+' : '') + fmt(profit) +
+        ' ARS (' + (pct >= 0 ? '+' : '') + fmt(pct, 3) + '%)';
+
+      $('aProfit').className =
+        'price ' + (profit >= 0 ? 'green' : 'red');
+
+      $('aDetail').textContent =
+        compra.merchant + ' → ' + venta.merchant +
+        ' · ' + fmt(usdt, 4) + ' USDT' +
+        ' · ' + fmt(invertido) + ' ARS invertidos' +
+        ' → ' + fmt(bob) + ' BOB' +
+        ' → ' + fmt(arsEnd) + ' ARS';
+
+      results.push({
+        name: 'A',
+        pct,
+        profit
+      });
+
+    } else {
+      $('aProfit').textContent = 'Sin pareja compatible';
+      $('aDetail').textContent =
+        'No existe una combinación de anuncios que coincida con los límites y el capital.';
+    }
+
+  } else {
+    $('aProfit').textContent = 'Capital o cotización inválidos';
+    $('aDetail').textContent =
+      'Revisa el capital en ARS y la cotización de Supabase.';
+  }
+
+  // Ruta B: comprar USDT en BOB y vender USDT en ARS.
+  if (cs > 0 && capitalBob > 0) {
+    const pareja = mejorPareja('BOB', 'ARS', capitalBob);
+
+    if (pareja) {
+      const { compra, venta, usdt } = pareja;
+
+      const invertido = usdt * compra.price;
+      const ars = usdt * venta.price * (1 - fee);
+      const bobEnd = ars * cs * (1 - fee) - cost;
+
+      const profit = bobEnd - invertido;
+      const pct = profit / invertido * 100;
+
+      $('bProfit').textContent =
+        (profit >= 0 ? '+' : '') + fmt(profit) +
+        ' BOB (' + (pct >= 0 ? '+' : '') + fmt(pct, 3) + '%)';
+
+      $('bProfit').className =
+        'price ' + (profit >= 0 ? 'green' : 'red');
+
+      $('bDetail').textContent =
+        compra.merchant + ' → ' + venta.merchant +
+        ' · ' + fmt(usdt, 4) + ' USDT' +
+        ' · ' + fmt(invertido) + ' BOB invertidos' +
+        ' → ' + fmt(ars) + ' ARS' +
+        ' → ' + fmt(bobEnd) + ' BOB';
+
+      results.push({
+        name: 'B',
+        pct,
+        profit
+      });
+
+    } else {
+      $('bProfit').textContent = 'Sin pareja compatible';
+      $('bDetail').textContent =
+        'No existe una combinación de anuncios que coincida con los límites y el capital.';
+    }
+
+  } else {
+    $('bProfit').textContent = 'Capital o cotización inválidos';
+    $('bDetail').textContent =
+      'Revisa el capital en BOB y la cotización de Supabase.';
+  }
+
+  // Decisión final.
+  if (!results.length) {
+    $('decision').textContent =
+      'No hay operaciones compatibles con los límites y capitales actuales.';
+
+  } else {
+    results.sort((a, b) => b.pct - a.pct);
+
+    const top = results[0];
+
+    $('decision').textContent = top.pct > 0
+      ? 'La ruta ' + top.name +
+        ' presenta un margen bruto estimado de ' +
+        fmt(top.pct, 3) +
+        '%. Verifica métodos de pago, comisiones y liquidación.'
+      : 'Con los precios actuales ninguna ruta muestra ganancia.';
+  }
+}
+
+
 $('refresh').onclick=refresh;$('calc').onclick=()=>{renderAds();calculate()};$('auto').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('auto').textContent='Activar actualización cada 60 segundos'}else{timer=setInterval(refresh,60000);$('auto').textContent='Desactivar actualización automática';refresh()}};
 ['arsBuyRate','arsSellRate','capitalArs','capitalBob','fee','cost'].forEach(id=>$(id).addEventListener('input',()=>{if(market){renderAds();calculate()}}));refresh();
 </script></body></html>
